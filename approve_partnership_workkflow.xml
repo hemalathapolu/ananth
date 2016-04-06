@@ -1,0 +1,242 @@
+<?xml version="1.0"?>
+<workflow-definition xmlns="urn:liferay.com:liferay-workflow_6.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="urn:liferay.com:liferay-workflow_6.1.0 http://www.liferay.com/dtd/liferay-workflow-definition_6_1_0.xsd">
+	<name>Aprrove Partnership</name>
+	<description>
+																																																																																																																																			</description>
+		<version>1</version>
+		<condition>
+			<name>checkapprovedcheckbox</name>
+			<description>
+				<![CDATA["test if approved or not, and separate actions after"]]>
+			</description>
+			<metadata><![CDATA[{"transitions":{"reassign":{"bendpoints":[]},"approve":{"bendpoints":[]},"reject":{"bendpoints":[]}},"xy":[331,295]}]]></metadata>
+			<script>
+				<![CDATA[
+					import com.liferay.portal.kernel.log.*;
+					import com.liferay.portal.kernel.util.GetterUtil;
+					import com.liferay.portal.kernel.workflow.WorkflowConstants;
+					import com.liferay.portal.service.ServiceContext;
+					import com.liferay.portlet.dynamicdatamapping.storage.Field;
+					import com.liferay.portlet.dynamicdatamapping.storage.Fields;
+					import com.liferay.portlet.dynamicdatalists.model.DDLRecord;
+					import com.liferay.portlet.dynamicdatalists.service.DDLRecordLocalServiceUtil;
+					
+					long companyId = GetterUtil.getLong((String) workflowContext.get(WorkflowConstants.CONTEXT_COMPANY_ID));
+					
+					ServiceContext serviceContext = (ServiceContext) workflowContext.get(WorkflowConstants.CONTEXT_SERVICE_CONTEXT);
+					long classPK = GetterUtil.getLong((String)workflowContext.get(WorkflowConstants.CONTEXT_ENTRY_CLASS_PK));
+					DDLRecord ddlRecord = DDLRecordLocalServiceUtil.getRecord(classPK);
+					Log log = LogFactoryUtil.getLog("Workflow Logger");
+					log.info("ddlRecord is " + ddlRecord);
+					
+					boolean debugMode = true;
+					if (debugMode)    // Mode débogage
+					{
+						Fields allFields = ddlRecord.getFields();	// So we get all fields from the record
+						Iterator<Field> it = allFields.iterator();	// we get the iterator to iterate these fields
+						while(it.hasNext())		// go for the iteration !
+						{
+							Field oneField = it.next();	// Get the current Field	
+							log.info(oneField.getName() + " = " + oneField.getType() + " / " + oneField.getValue());	// And display it as à log !
+						}
+					}
+					
+					Field field = ddlRecord.getField("record_approval");
+					String  status = GetterUtil.getString(field.getValue());
+					log.info("status = " + status);
+					if (status.toLowerCase().contains("yes"))
+					{
+						returnValue = "approve";	// YES selected => validation
+					}
+					else if (status.toLowerCase().contains("reassign"))
+					{
+						returnValue = "reassign";	// let's go for another ride
+					}
+					else
+					{
+						returnValue = "reject"; 	// NO selected => reject
+					}
+					log.info("returnValue = " + returnValue);
+				]]>
+			</script>
+			<script-language>groovy</script-language>
+			<transitions>
+            <transition>
+                <name>reject</name>
+                <target>cancelednotsaved</target>
+                <default>false</default>
+            </transition>
+            <transition>
+                <name>approve</name>
+                <target>approvedthensaved</target>
+                <default>true</default>
+            </transition>
+            <transition>
+                <name>reassign</name>
+                <target>approvalstep</target>
+                <default>false</default>
+            </transition>
+			</transitions>
+		</condition>
+		<state>
+			<name>EnteringDatas</name>
+			<description>
+				<![CDATA["Entering datas"]]>
+			</description>
+			<metadata><![CDATA[{"transitions":{"toapprovalstep":{"bendpoints":[]}},"xy":[100,40]}]]></metadata>
+			<initial>true</initial>
+			<transitions>
+            <transition>
+                <name>toapprovalstep</name>
+                <target>approvalstep</target>
+                <default>true</default>
+            </transition>
+			</transitions>
+		</state>
+		<state>
+			<name>cancelednotsaved</name>
+			<metadata>
+				<![CDATA[{"terminal":true,"xy":[432,462]}]]>
+			</metadata>
+			<actions>
+				<action>
+					<name>Rejected</name>
+					<description>Rejected</description>
+					<script>
+						<![CDATA[Packages.com.liferay.portal.kernel.workflow.WorkflowStatusManagerUtil.updateStatus(Packages.com.liferay.portal.kernel.workflow.WorkflowConstants.toStatus("rejected"), workflowContext);]]>
+					</script>
+					<script-language>javascript</script-language>
+					<execution-type>onEntry</execution-type>
+				</action>
+				<!-- <notification>
+					<name>Rejected</name>
+					<description>Notify user creator that the partner has been rejected</description>
+					<template>The partner you created has been rejected</template>
+					<template-language>text</template-language>
+					<notification-type>email</notification-type>
+					<recipients>
+						<user/>
+					</recipients>
+					<execution-type>onEntry</execution-type>
+				</notification> -->
+			</actions>
+		</state>
+		<state>
+			<name>approvedthensaved</name>
+			<metadata>
+				<![CDATA[{"terminal":true,"xy":[204,454]}]]>
+			</metadata>
+			<actions>
+				<action>
+					<name>Approved and saved</name>
+					<description>Approved and saved</description>
+					<script>
+						<![CDATA[Packages.com.liferay.portal.kernel.workflow.WorkflowStatusManagerUtil.updateStatus(Packages.com.liferay.portal.kernel.workflow.WorkflowConstants.toStatus("approved"), workflowContext);]]>
+					</script>
+					<script-language>javascript</script-language>
+					<execution-type>onEntry</execution-type>
+				</action>
+				<!-- <notification>
+					<name>Saved and closed</name>
+					<description>Notify user creator that the partner has been validated</description>
+					<template>The partner you created has been validated</template>
+					<template-language>text</template-language>
+					<notification-type>email</notification-type>
+					<recipients>
+                    <address></address>
+						<user/>
+					</recipients>
+					<execution-type>onEntry</execution-type>
+				</notification> -->
+			</actions>
+		</state>
+		<state>
+			<name>autosubmitstate</name>
+			<description>
+				<![CDATA["Dummy task auto-submitted"]]>
+			</description>
+			<metadata><![CDATA[{"transitions":{"tovalidatedcheck":{"bendpoints":[]}},"xy":[468,174]}]]></metadata>
+			<actions>
+				<action>
+					<name>Dummy task auto-submitted</name>
+					<description>Dummy task auto-submitted</description>
+					<script>
+						<![CDATA[returnValue = "tovalidatecheck";]]>
+					</script>
+					<script-language>groovy</script-language>
+					<execution-type>onEntry</execution-type>
+				</action>
+			</actions>
+			<transitions>
+				<transition>
+					<name>tovalidatedcheck</name>
+					<target>checkapprovedcheckbox</target>
+					<default>true</default>
+				</transition>
+			</transitions>
+		</state>
+		<task>
+			<name>approvalstep</name>
+			<description>
+				<![CDATA["Approval form"]]>
+			</description>
+			<metadata><![CDATA[{"transitions":{"submit":{"bendpoints":[]},"todummystep":{"bendpoints":[]}},"xy":[287,76]}]]></metadata>
+				<!-- <actions>
+			 <notification>
+					<name>ValidationRequiredNotification</name>
+					<description>A new partner has been created. Please have a look.</description>
+					<template>A new partner has been created, your validation is required</template>
+					<template-language>text</template-language>
+					<notification-type>email</notification-type>
+					<execution-type>onAssignment</execution-type>
+				</notification>
+				
+			</actions>
+			-->
+			<assignments>
+				<scripted-assignment>
+   		 			<script>
+        				<![CDATA[
+           				import com.liferay.portal.kernel.util.GetterUtil;
+            			import com.liferay.portal.kernel.workflow.WorkflowConstants;
+            			import com.liferay.portal.model.Group;
+            			import com.liferay.portal.model.Role;
+            			import java.util.ArrayList;
+            			import java.util.List;
+            			import com.liferay.portal.service.GroupLocalServiceUtil;
+            			import com.liferay.portal.service.RoleLocalServiceUtil;
+            			import com.liferay.portal.model.UserGroupRole;
+            			import com.liferay.portal.service.UserGroupRoleLocalServiceUtil;
+						roles = new ArrayList <Role> ();
+						Role role = null; 
+            			long companyId = GetterUtil.getLong((String) workflowContext.get(WorkflowConstants.CONTEXT_COMPANY_ID));
+            			println("companyId : "+companyId );
+            			long groupId = GetterUtil.getLong((String)workflowContext.get(WorkflowConstants.CONTEXT_GROUP_ID)); // Variables per als roles Group 
+						println("groupId::"+groupId);
+						println("role::"+workflowContext.get("roleId"));
+						
+						if(GetterUtil.getObject(workflowContext.get("roleId")!=null)){
+						long roleId = (Long)GetterUtil.getObject(workflowContext.get("roleId"));
+						println("roleId::"+roleId);
+						List<UserGroupRole> userGroupRoles = UserGroupRoleLocalServiceUtil.getUserGroupRolesByGroupAndRole(groupId, roleId);
+						role = userGroupRoles.get(0).getRole();
+  						println("role::"+role);	
+  						}
+						roles.add(role); 
+						println("roles::"+roles);			
+						user = null;
+						
+        			]]>
+    				</script>
+    			<script-language>groovy</script-language>
+			</scripted-assignment>
+			</assignments>
+			<transitions>
+				<transition>
+					<name>submit</name>
+					<target>autosubmitstate</target>
+					<default>true</default>
+				</transition>
+			</transitions>
+		</task>
+	</workflow-definition>
